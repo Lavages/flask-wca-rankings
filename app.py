@@ -8,6 +8,7 @@ app = Flask(__name__)
 
 # Load TSV files from Dropbox links
 def load_data():
+    # Define the data types for the two datasets
     dtypes_results = {
         'personId': 'string',
         'eventId': 'string',
@@ -27,18 +28,27 @@ def load_data():
     results_link = "https://www.dropbox.com/scl/fi/js90qjcxckuld3gmxi3lg/WCA_export_Results.tsv?rlkey=hdx54ocgglhhlg7bhp47t6ig6&st=6a7qvnwr&dl=1"
 
     def read_tsv_from_dropbox(link, dtype, usecols):
-        response = requests.get(link)
-        response.raise_for_status()
-        return pd.read_csv(StringIO(response.text), sep="\t", dtype=dtype, usecols=usecols)
+        """Reads TSV data from a Dropbox link into a DataFrame."""
+        try:
+            response = requests.get(link)
+            response.raise_for_status()
+            return pd.read_csv(StringIO(response.text), sep="\t", dtype=dtype, usecols=usecols)
+        except requests.exceptions.RequestException as e:
+            print(f"Error downloading data: {e}")
+            return pd.DataFrame()  # Return an empty DataFrame on error
 
+    # Load data
     results_df = read_tsv_from_dropbox(results_link, dtypes_results, ['personId', 'eventId', 'personCountryId', 'best', 'personName'])
     ranks_df = read_tsv_from_dropbox(ranks_link, dtypes_ranks, ['personId', 'eventId', 'countryRank', 'best'])
+
     return results_df, ranks_df
 
+# Initialize and load the data
 results_df, ranks_df = load_data()
 
-# Merge DataFrames
+# Merge DataFrames on common columns
 def merge_data(results_df, ranks_df):
+    """Merge results and ranks DataFrames."""
     return pd.merge(
         results_df,
         ranks_df,
@@ -46,10 +56,12 @@ def merge_data(results_df, ranks_df):
         how="inner"
     )
 
+# Merge the data
 merged_df = merge_data(results_df, ranks_df)
 
 # Helper Functions
 def format_rank(rank):
+    """Format rank into a readable string."""
     rank = int(rank)
     if rank == 1:
         return f"{rank}st"
@@ -61,12 +73,14 @@ def format_rank(rank):
         return f"{rank}th"
 
 def format_time(centiseconds):
+    """Format time from centiseconds to mm:ss.cc."""
     centiseconds = int(centiseconds)
     minutes, centiseconds = divmod(centiseconds, 6000)
     seconds, fractional = divmod(centiseconds, 100)
     return f"{minutes}:{seconds:02d}.{fractional:02d}" if minutes > 0 else f"{seconds}.{fractional:02d}"
 
 def format_best_result(event_id, best):
+    """Format the best result based on the event type."""
     if event_id == "333fm":
         return f"{int(best)}"
     elif event_id == "333mbf":
@@ -84,28 +98,13 @@ def format_best_result(event_id, best):
 
 @app.route('/')
 def home():
+    """Home route to display the event list and regions."""
     event_names = {
-        "333": "3x3",
-        "222": "2x2",
-        "444": "4x4",
-        "555": "5x5",
-        "666": "6x6",
-        "777": "7x7",
-        "333bf": "3x3 Blindfolded",
-        "333fm": "3x3 Fewest Moves",
-        "333oh": "3x3 One-Handed",
-        "clock": "Clock",
-        "minx": "Megaminx",
-        "pyram": "Pyraminx",
-        "skewb": "Skewb",
-        "sq1": "Square-1",
-        "444bf": "4x4 Blindfolded",
-        "555bf": "5x5 Blindfolded",
-        "333mbf": "3x3 Multi-Blind",
-        "333mbo": "3x3 Multi-Blind Old Style",
-        "magic": "Magic",
-        "mmagic": "Master Magic",
-        "333ft": "3x3 With Feet",
+        "333": "3x3", "222": "2x2", "444": "4x4", "555": "5x5", "666": "6x6", "777": "7x7",
+        "333bf": "3x3 Blindfolded", "333fm": "3x3 Fewest Moves", "333oh": "3x3 One-Handed",
+        "clock": "Clock", "minx": "Megaminx", "pyram": "Pyraminx", "skewb": "Skewb", "sq1": "Square-1",
+        "444bf": "4x4 Blindfolded", "555bf": "5x5 Blindfolded", "333mbf": "3x3 Multi-Blind",
+        "333mbo": "3x3 Multi-Blind Old Style", "magic": "Magic", "mmagic": "Master Magic", "333ft": "3x3 With Feet",
     }
     events = sorted(event_names.keys())
     regions = merged_df['personCountryId'].unique()
@@ -113,29 +112,14 @@ def home():
 
 @app.route('/search', methods=['POST'])
 def search():
+    """Search route to query the rankings and results based on user input."""
     try:
         event_names = {
-            "333": "3x3",
-            "222": "2x2",
-            "444": "4x4",
-            "555": "5x5",
-            "666": "6x6",
-            "777": "7x7",
-            "333bf": "3x3 Blindfolded",
-            "333fm": "3x3 Fewest Moves",
-            "333oh": "3x3 One-Handed",
-            "clock": "Clock",
-            "minx": "Megaminx",
-            "pyram": "Pyraminx",
-            "skewb": "Skewb",
-            "sq1": "Square-1",
-            "444bf": "4x4 Blindfolded",
-            "555bf": "5x5 Blindfolded",
-            "333mbf": "3x3 Multi-Blind",
-            "333mbo": "3x3 Multi-Blind Old Style",
-            "magic": "Magic",
-            "mmagic": "Master Magic",
-            "333ft": "3x3 With Feet",
+            "333": "3x3", "222": "2x2", "444": "4x4", "555": "5x5", "666": "6x6", "777": "7x7",
+            "333bf": "3x3 Blindfolded", "333fm": "3x3 Fewest Moves", "333oh": "3x3 One-Handed",
+            "clock": "Clock", "minx": "Megaminx", "pyram": "Pyraminx", "skewb": "Skewb", "sq1": "Square-1",
+            "444bf": "4x4 Blindfolded", "555bf": "5x5 Blindfolded", "333mbf": "3x3 Multi-Blind",
+            "333mbo": "3x3 Multi-Blind Old Style", "magic": "Magic", "mmagic": "Master Magic", "333ft": "3x3 With Feet",
         }
 
         event_id = request.form.get('event_id')
